@@ -1,3 +1,5 @@
+require 'pry'
+
 SUITS = ['H', 'C', 'S', 'D']
 VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
 WINNING_SCORE = 5
@@ -18,13 +20,13 @@ def total(cards)
   # values = ['3', 'Q', .....]
   sum = 0
   values.each do |value|
-    if value == 'A'
-      sum += 11
-    elsif value.to_i == 0
-      sum += 10
-    else
-      sum += value.to_i
-    end
+    sum = if value == 'A'
+            sum + 11
+          elsif value.to_i == 0
+            sum + 10
+          else
+            sum + value.to_i
+          end
   end
 
   values.select { |value| value == "A" }.count.times do
@@ -86,18 +88,19 @@ def update_score(dealer_total, player_total, score)
   end
 end
 
-def show_score(scr)
+def display_score(scr)
   prompt "Your score is #{scr[:player_score]}"
   prompt "Dealers score is #{scr[:dealer_score]}"
 end
 
-def next_round?(scr)
+def display_end_game
   puts '-------------------------'
-  if winner?(scr)
-    prompt "The game is over...."
-  else
-    prompt "Get ready for the next round...."
-  end
+  prompt "The game is over...."
+end
+
+def display_next_round
+  puts '-------------------------'
+  prompt "Get ready for the next round...."
   sleep 3
 end
 
@@ -121,6 +124,40 @@ def winner?(scr)
     scr[:dealer_score] == WINNING_SCORE
 end
 
+def validate_answer
+  player_answer = nil
+  loop do
+    prompt "Do you want to hit or stay? Enter 'h' for hit, 's' for stay."
+    player_answer = gets.chomp
+    break if ['h', 's'].include?(player_answer)
+    prompt "Sorry, you must choose to hit(h) or stay(s)."
+  end
+  player_answer
+end
+
+def dealer_turn_and_total(dealer_cards, dealer_total, deck)
+  loop do
+    break if dealer_total >= DEALER_STAY
+
+    prompt("Dealer hits!")
+    dealer_cards << deck.pop
+    dealer_total = total(dealer_cards)
+    prompt("The dealers cards are #{dealer_cards}")
+  end
+  dealer_total
+end
+
+def player_hit(player_cards, player_total, deck, player_answer)
+  if player_answer == 'h'
+    player_cards << deck.pop
+    player_total = total(player_cards)
+    prompt("You chose to hit!")
+    prompt("Your cards are now #{player_cards}")
+    prompt("You have a total of #{player_total}")
+  end
+  player_total
+end
+
 score = { player_score: 0, dealer_score: 0 }
 prompt("Welcome to Twenty-One!")
 prompt("First to win 5 rounds is the grand winner.")
@@ -129,8 +166,6 @@ loop do
   deck = initialize_deck
   player_cards = []
   dealer_cards = []
-  player_total = total(player_cards)
-  dealer_total = total(dealer_cards)
 
   2.times do
     player_cards << deck.pop
@@ -148,33 +183,19 @@ loop do
   prompt("You have a total of #{player_total}")
 
   loop do
-    player_answer = nil
-
-    loop do
-      prompt("Do you want to hit or stay?")
-      player_answer = gets.chomp
-      break if ['hit', 'stay'].include?(player_answer)
-      prompt("Sorry, you must choose to hit or stay.")
-    end
+    player_answer = validate_answer
     system 'clear'
-
-    if player_answer == 'hit'
-      player_cards << deck.pop
-      player_total = total(player_cards)
-      prompt("You chose to hit!")
-      prompt("Your cards are now #{player_cards}")
-      prompt("You have a total of #{player_total}")
-    end
-
-    break if player_answer == 'stay' || busted?(player_total)
+    player_total = player_hit(player_cards, player_total, deck, player_answer)
+    break if player_answer == 's' || busted?(player_total)
   end
 
   if busted?(player_total)
     display_results(dealer_total, player_total)
     update_score(dealer_total, player_total, score)
     grand_output(dealer_cards, dealer_total, player_cards, player_total)
-    show_score(score)
-    next_round?(score)
+    display_score(score)
+    display_end_game if winner?(score)
+    display_next_round if !winner?(score)
     next unless winner?(score)
     break if winner?(score)
   else
@@ -186,22 +207,16 @@ loop do
   prompt("Dealer turn....")
   sleep 3
 
-  loop do
-    break if dealer_total >= DEALER_STAY
-
-    prompt("Dealer hits!")
-    dealer_cards << deck.pop
-    dealer_total = total(dealer_cards)
-    prompt("The dealers cards are #{dealer_cards}")
-  end
+  dealer_total = dealer_turn_and_total(dealer_cards, dealer_total, deck)
 
   if busted?(dealer_total)
     prompt "Dealer total is now #{dealer_total}"
     display_results(dealer_total, player_total)
     update_score(dealer_total, player_total, score)
     grand_output(dealer_cards, dealer_total, player_cards, player_total)
-    show_score(score)
-    next_round?(score)
+    display_score(score)
+    display_end_game if winner?(score)
+    display_next_round if !winner?(score)
     next unless winner?(score)
     break if winner?(score)
   else
@@ -212,8 +227,9 @@ loop do
   grand_output(dealer_cards, dealer_total, player_cards, player_total)
   display_results(dealer_total, player_total)
   update_score(dealer_total, player_total, score)
-  show_score(score)
-  next_round?(score)
+  display_score(score)
+  display_end_game if winner?(score)
+  display_next_round if !winner?(score)
 
   break if winner?(score)
 end
